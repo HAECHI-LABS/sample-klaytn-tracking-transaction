@@ -36,7 +36,7 @@
   },
   "scripts": {
     "start": "react-app-env --env-file=config/.development.env start",
-    "start:prod": "node index.js",
+    "start:example": "node example.js",
     "build": "react-app-env --env-file=config/.${BUILD_ENV}.env build",
     "build:standalone": "BUILD_ENV=standalone npm run build",
     "test": "react-scripts test",
