@@ -3,24 +3,19 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const app = express();
-const {Sender} = require('./helper/Sender');
-const {TransactionTracker} = require('@haechi-labs/henesis-sdk-js');
+const {TransactionHelper} = require('./helper/TransactionHelper');
+const {HenesisCaver} = require('../henesis-sdk-js/packages/henesis-sdk-js');
 const {Transaction, Status} = require('./types/index');
 
 const transactions = {};
 
-const {CLIENT_ID, PRIVATE_KEY, NODE_ENDPOINT, PLATFORM, NETWORK} = process.env;
+const {PRIVATE_KEY, TN_ENDPOINT} = process.env;
 const TIMEOUT = 10000;
 const CONFIRMATION = 0;
 const GAS_PRICE = 25000000000;
 
-const tracker = new TransactionTracker(CLIENT_ID, {
-  platform: PLATFORM,
-  network: NETWORK,
-  url: 'http://localhost:8085'
-});
-
-const sender = new Sender(PRIVATE_KEY, NODE_ENDPOINT);
+const caver = new HenesisCaver(TN_ENDPOINT);
+const transactionHelper = new TransactionHelper(caver, PRIVATE_KEY);
 
 app.use(express.static(path.join(__dirname, 'build')));
 
@@ -36,15 +31,15 @@ app.get('/api/tx', function (req, res) {
 });
 
 app.post('/api/tx', async function (req, res) {
-  //Generate Transactions
-  const nonce = await sender.getNonce();
-  const transactionHash = await sender.send(nonce, GAS_PRICE);
-  console.log(`transaction generated. txHash:${transactionHash}`);
+  const nonce = await transactionHelper.getNonce();
+  const signedTransaction = await transactionHelper.getDefaultSignedTransaction(nonce, GAS_PRICE);
+  const hash = await caver.utils.sha3(signedTransaction);
 
-  //start tracking transaction
-  await tracker.trackTransaction(transactionHash, {
-    timeout: TIMEOUT,
-    confirmation: CONFIRMATION
+  console.log(`send transaction ${hash} with nonce ${nonce}`);
+
+  caver.klay.sendSignedTransaction(signedTransaction, {
+    timeout: TIMEOUT, // default is 30 * 1000
+    confirmation: CONFIRMATION // default is 6
   });
 
   const transaction = new Transaction(
@@ -61,13 +56,10 @@ app.get('/*', function (req, res) {
 });
 
 async function trackTx() {
-  const subscription = await tracker.subscribe(
-    'transaction',
-    {
-      subscriptionId: 'your-subscription-id',
-      ackTimeout: 30 * 1000 // default is 10 * 1000 (ms)
-    }
-  );
+  const subscription = await caver.klay.subscribe('transaction', {
+    subscriptionId: 'your-subscription-id',
+    ackTimeout: 30 * 1000 // default is 10 * 1000 (ms)
+  });
 
   subscription.on('message', async (message) => {
     console.log(`now transaction status is: ${message.data.type}`);

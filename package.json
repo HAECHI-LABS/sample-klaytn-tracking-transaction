@@ -1,5 +1,5 @@
 {
-  "name": "henesis-sample-klaytn-tx-tracker",
+  "name": "henesis-sample-klaytn-tracking-transaction",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
